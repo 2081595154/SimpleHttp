@@ -1,0 +1,61 @@
+多线程：
+单反应堆
+多反应堆 实现高并发
+所谓反应堆就是poll/epoll/select
+反应堆：机制：回调：other应用：qt信号槽，多线程，function+bind 可调函数包装器，绑定器
+
+channel说白了：文件描述符封装的一系列相关：值，对应的回调函数
+
+
+B/S架构 跨平台有利于
+上层：业务：通过HTTP，实现客户端对服务器访问，服务器提供文件，通过http请求在浏览器显示服务器提供的文件
+
+epoll_ctrl(epfd,epoll_ctrl_add,listenfd,&epoll_event)    epoll_event是结构体 {events:epollin epollet(设置边沿),date.fd:listenfd}
+epoll_wait(epfd,epoll_event[],epoll_event[].size(),-1)   -1:阻塞   内容存在epevents数组
+epoll_create(1)
+
+socket(AF_INET,SOCK_STREAM,0)
+setsockopt(listenfd,sol_socket,so_reuseaddr,&int a,sizeof(int a))
+bind(listenfd,sockaddr,sizeof(sockaddr))
+listen(listenfd,128)
+
+accept(listenfd,null,null,)  fd,sockaddr,size 可以存客户端信息
+fcntl（cfd,F_GETFL)     对flag异或修改属性|=  o_nonblock
+fcntl(cfd,f_setfl,flag)
+ 
+read(fd,buffer,sizeof(buffer))   从文件读 读到buffer return len
+send(cfd,buffer,len,0)    将buffer通过cfd发出
+
+sendfile(outfd,infd,offset,size infd)     infd打开的文件 outfd通信文件描述符
+lseek（fd，0，seek_end）  文件指针移到最后
+
+
+stat(file,&st)  struct stat st 通过st获取file状态
+S_ISDIR(st.st_mode)
+
+opendir（）得到文件指针
+readdir（）调用一次读其中一个文件，故读文件夹需多次读取
+closedir（）
+scandir（*dirp，dirent***,*filter,*compar）外部创二级指针，二级指针存函数分配的内存地址
+
+1.simple版：初始化监听套接字（基于tcp的），基于它，启动服务器程序，启动后监听，监听到有连接创建通信文件符与客户端连接
+2.设置端口复用：tcp四次挥手，客户端最后2msl时间不能使用原端口，故设置端口复用
+3，测试监听，不能直接检测，故引入epoll（底层红黑树）（1）创建epoll实例（树根节点，also文件描述符），epoll_create（随便大于0的数）（2）将监听文件描述符添加树上
+
+http协议    每一行以\r\n结束 
+请求                                                                                                                                  
+请求行 GET /->这个是服务器给客户端提供的资源目录  http版本HTTP/1.1        
+请求头：若干键值对                                                                                            
+空行
+空
+
+post请求 大致同get请求    提交数据在地址栏不可见
+请求头 content-type：四类:大文件 multipart/from-date    application/x-www-form-urlencoded(k=v&k=v)     application/json{json对象或json数组} text/xml(类似于html)
+
+相应
+状态行 http版本 状态码
+状态头 若干键值对    content-type：text/plain纯文本 orhtml   ‘charset（编码）
+
+读线程，若为阻塞，读完之后阻塞在recv，非阻塞，读完recv不会阻塞，读到空返回-1
+
+
