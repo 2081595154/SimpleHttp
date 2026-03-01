@@ -13,7 +13,13 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <pthread.h>
 
+struct fdinfo{
+    int epfd;
+    int cfd;
+    pthread_t thread_id;
+};
 
 int listenSocket(int port){
     //创建监听套接字
@@ -60,7 +66,7 @@ int runepoll(int lsfd){
     epevnt.data.fd=lsfd;
     epevnt.events=EPOLLIN;
     int ret=epoll_ctl(epfd,EPOLL_CTL_ADD,lsfd,&epevnt);
-    if(ret==1){
+    if(ret==-1){
         perror("epolllink");
         return -1;
     }
@@ -71,24 +77,30 @@ int runepoll(int lsfd){
         int nready=epoll_wait(epfd,epevnts,num,-1);
         //对每一个事件判断
         for(int i=0;i<nready;i++){
+            struct fdinfo* info =(struct info*)malloc(sizeof(struct fdinfo));
+            info->epfd=epfd;
+            info->cfd=epevnts[i].data.fd;
             if(epevnts[i].data.fd==lsfd){
-                acceptclient(lsfd,epfd);
+                //acceptclient(lsfd,epfd);
+                pthread_create(&info->thread_id,NULL,acceptclient,info);
             }else{
                 //数据接收
-                recvhttp(epevnts[i].data.fd,epfd);
+                //recvhttp(epevnts[i].data.fd,epfd);
+                pthread_create(&info->thread_id,NULL,recvhttp,info);
             }
         }
     }
     return 0;
 }
 
-int acceptclient(int lsfd,int epfd){
+void* acceptclient(void* arg){
     //建立连接
-    int cfd=accept(lsfd,NULL,NULL);
+    struct fdinfo* info=(struct fdinfo*)arg;
+    int cfd=accept(info->cfd,NULL,NULL);
     printf("accept 得到新连接, cfd=%d\n", cfd);
     if(cfd==-1){
         perror("acceptclient");
-        return -1;
+        return NULL;
     }
     //修改为非阻塞
     int flag=fcntl(cfd,F_GETFL);
@@ -98,21 +110,24 @@ int acceptclient(int lsfd,int epfd){
     struct epoll_event epevnt;
     epevnt.data.fd=cfd;
     epevnt.events=EPOLLIN | EPOLLET;
-    int ret=epoll_ctl(epfd,EPOLL_CTL_ADD,cfd,&epevnt);
+    int ret=epoll_ctl(info->epfd,EPOLL_CTL_ADD,cfd,&epevnt);
     if(ret==-1){
         perror("acclient-epolllink");
-        return -1;
+        return NULL;
     }
-    return 0;
+    printf("acceptclient threadid:%ld\n",info->thread_id);
+    free(info);
+    return NULL;
 }
 
-int recvhttp(int cfd,int epfd){
-    printf("开始接收数据,cfd=%d\n",cfd);
+void* recvhttp(void* arg){
+    struct fdinfo* info=(struct fdinfo*)arg;
+    printf("开始接收数据,cfd=%d\n",info->cfd);
     char buffer[4096]={0};//非阻塞只通知一次,故一次读出
     char temp[1024]={0};//避免覆盖buffer,故建临时缓冲
     int count=0;
     int nextcnt=0;
-    while((count=recv(cfd,temp,sizeof(temp),0))>0){
+    while((count=recv(info->cfd,temp,sizeof(temp),0))>0){
         if(nextcnt+count<sizeof(buffer)){
             memcpy(buffer+nextcnt,temp,count);
             nextcnt+=count;
@@ -124,15 +139,17 @@ int recvhttp(int cfd,int epfd){
     char* pt=strstr(buffer,"\r\n");
     int len=pt-buffer;
     buffer[len]='\0';
-    parseline(buffer,cfd);
+    parseline(buffer,info->cfd);
     }else if(count==0){
-        epoll_ctl(epfd,EPOLL_CTL_DEL,cfd,NULL);//该情况为断开连接
-        close(cfd);
+        epoll_ctl(info->epfd,EPOLL_CTL_DEL,info->cfd,NULL);//该情况为断开连接
+        close(info->cfd);
     }else{
         perror("recvhttp");
-        return -1;
+        return NULL;
     }
-    return 0;
+    printf("recvhttp threadid:%ld\n",info->thread_id);
+    free(info);
+    return NULL;
 }
 
 

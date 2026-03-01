@@ -2,8 +2,10 @@
 
 int listenSocket(int port);
 int runepoll(int lsfd);
-int acceptclient(int lsfd,int epfd);
-int recvhttp(int cfd,int epfd);//第二个参数,当断开连接时,从epoll树上删除该节点
+//int acceptclient(int lsfd,int epfd);
+void* acceptclient(void* arg);
+//int recvhttp(int cfd,int epfd);//第二个参数,当断开连接时,从epoll树上删除该节点
+void* recvhttp(void* arg);
 int parse(const char* line,int cfd);
 int sendFile(const char* filename,int cfd);
 //发送响应头（状态行，响应头）只要通信就要cfd
